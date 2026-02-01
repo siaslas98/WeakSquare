@@ -1,7 +1,9 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+origins = os.getenv("CORS_ORIGINS", "").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,7 +17,7 @@ app.add_middleware(
 async def root():
     return {"message": "Hello World"}
 
-@app.get("/health")
-def health():
+@app.post("/uploadFile/")
+def upload_file():
     return {"status": "ok"}
 
