@@ -2,11 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import {Chessboard} from 'react-chessboard';
 import {Chess} from 'chess.js';
 import axios from "axios";
-import './App.css';
+import MoveNavigation from './components/moveNavigation';
 
-// On file upload, read the text from the file
-// Parse the text from the file using a pgn parser
-// Provide Render Chessboard with the moves to be able to navigate through the moves using arrow keys or a button
+import './App.css';
 
 function UploadFile({setMoveList}) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -48,18 +46,11 @@ function UploadFile({setMoveList}) {
 	);
 }
 
-// Add an event detection, if left arrow undo a move if possible, if right arrow, make the next move, update board
-function RenderChessBoard({moveList}){
-	  // create a chess game using a ref to always have access to the latest game state within closures and maintain the game state across renders
-    const chessGameRef = useRef(new Chess());
-    const chessGame = chessGameRef.current;
-
-    // track the current position of the chess game in state to trigger a re-render of the chessboard
-    const [chessPosition, setChessPosition] = useState(chessGame.fen());
+function RenderChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveIndex, setMoveIndex}){
 		const [moveFrom, setMoveFrom] = useState('');
     const [optionSquares, setOptionSquares] = useState({});
-    const [moveIndex, setMoveIndex] = useState(0);
 
+    // Handle key press for left and right arrow keys
     useEffect(() => {
      function handleKeyDown(e) {
       if(!moveList || moveList.length === 0) return;
@@ -94,7 +85,7 @@ function RenderChessBoard({moveList}){
      return () => window.removeEventListener('keydown', handleKeyDown);
     }, [moveList, moveIndex, chessGame])
 
-		// get the move options for a square to show valid moves
+		// Get the move options for a square to show valid moves
     function getMoveOptions(square) {
       // get the moves for the square
       const moves = chessGame.moves({
@@ -194,7 +185,7 @@ function RenderChessBoard({moveList}){
       setMoveFrom('');
       setOptionSquares({});
     }
-    // handle piece drop
+    // Handle piece drop
     function onPieceDrop(sourceSquare, targetSquare) {
       // type narrow targetSquare potentially being null (e.g. if dropped off board)
       if (!targetSquare) {
@@ -224,7 +215,7 @@ function RenderChessBoard({moveList}){
       }
     }
 
-    // set the chessboard options
+    // Set the chessboard options
     const chessboardOptions = {
       position: chessPosition,
       onPieceDrop,
@@ -240,20 +231,26 @@ function RenderChessBoard({moveList}){
 			squareStyles: optionSquares
     };
 
-    // render the chessboard
+    // Render the chessboard
     return <Chessboard options={chessboardOptions} />;
 }
 
 function App() {
-  const [status, setStatus] = useState(null);
-  const [chess, setChess] = useState(new Chess());
+  const chessGameRef = useRef(new Chess());
+  const chessGame = chessGameRef.current;
+  const [chessPosition, setChessPosition] = useState(chessGame.fen());
+
   const [moveList, setMoveList] = useState([]);
+  const [moveIndex, setMoveIndex] = useState(0);
+
+  const navProps = { chessGame, chessPosition, setChessPosition, moveList, moveIndex, setMoveIndex };
 
   return (
     <div className="min-h-screen w-screen">
       <h1 className="mb-[2rem]">WeakSquare</h1>
       <UploadFile setMoveList={setMoveList} />
-			<RenderChessBoard moveList={moveList}/>
+			<RenderChessBoard {...navProps} />
+      <MoveNavigation {...navProps} />
     </div>
   );
 }
