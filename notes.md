@@ -1,0 +1,5 @@
+- Create a board component using react-chessboard
+- Create file upload mechanism
+  - Parse pgn file and store moves in chess.js
+  - When user presses left or right key, update chess board state
+  - Rerender React Chessboard
