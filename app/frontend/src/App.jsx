@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import {Chessboard} from 'react-chessboard';
 import {Chess} from 'chess.js';
 import axios from "axios";
-import MoveNavigation from './components/moveNavigation';
+import MoveNavigation from './components/moveNavigation.jsx';
+import MoveListPanel from './components/moveListPanel.jsx';
 
 import './App.css';
 
@@ -226,7 +227,7 @@ function RenderChessBoard({chessGame, chessPosition, setChessPosition, moveList,
         boxShadow: '0 0 10px 0 rgba(0, 0, 0, 0.5)',
         border: '1px solid #000',
         margin: '20px auto',
-				width: '25%'
+				width: '100%'
       },
 			squareStyles: optionSquares
     };
@@ -245,14 +246,32 @@ function App() {
 
   const navProps = { chessGame, chessPosition, setChessPosition, moveList, moveIndex, setMoveIndex };
 
+  // Sync board position whenever moveIndex changes
+  useEffect(() => {
+    chessGame.reset();
+    for (let i = 0; i < moveIndex; i++) {
+      const move = moveList[i];
+      chessGame.move({ from: move.from, to: move.to, promotion: move.promotion });
+    }
+    setChessPosition(chessGame.fen());
+  }, [moveIndex]);
+
   return (
-    <div className="min-h-screen w-screen">
-      <h1 className="mb-[2rem]">WeakSquare</h1>
-      <UploadFile setMoveList={setMoveList} />
-			<RenderChessBoard {...navProps} />
-      <MoveNavigation {...navProps} />
+    <div className="flex">
+      <div className="min-h-screen w-[100vw]">
+        <h1 className="mb-[2rem]">WeakSquare</h1>
+        <UploadFile setMoveList={setMoveList} />
+        <div className=" flex max-h-[800px] w-[1000px] mx-auto mt-[100px] gap-[20px]">
+          <RenderChessBoard className="h-full" {...navProps} />
+          <MoveListPanel className="h-[500px]" moveList={moveList} setMoveIndex={setMoveIndex}></MoveListPanel>
+        </div>
+        <MoveNavigation {...navProps} />
+      </div>
     </div>
   );
 }
 
 export default App
+
+// TODO: Connect button with event handler
+// On click, update moveIndex

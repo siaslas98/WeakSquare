@@ -1,0 +1,7 @@
+li:nth-child(odd) { background: #375590; }
+li:nth-child(even) { background: #982e2e; }
+
+.moveButton {
+  background-color: transparent;
+  border-style: none;
+}
