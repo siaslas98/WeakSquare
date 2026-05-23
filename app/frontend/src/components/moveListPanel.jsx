@@ -1,8 +1,8 @@
 import '../styles/moveListPanel.css'
 
-export default function MoveListPanel({moveList, setMoveIndex}){
+export default function MoveListPanel({moveList, goToMove}){
   const handleMoveClick = (j) => {
-    setMoveIndex(j);
+    goToMove(j);
   };
 
   const rows = [];
@@ -11,8 +11,8 @@ export default function MoveListPanel({moveList, setMoveIndex}){
     rows.push(
       <li key={i} className="flex-[1_1_100%]">
         <span className="mx-4">{moveNumber}.</span>
-        <button className="moveButton" onClick={() => handleMoveClick(i)}>{moveList[i].to}</button>
-        {moveList[i + 1] && <button className="moveButton" onClick={() => handleMoveClick(i+1)}>{moveList[i + 1].to}</button>}
+        <button className="moveButton" onClick={() => handleMoveClick(i + 1)}>{moveList[i].to}</button>
+        {moveList[i + 1] && <button className="moveButton" onClick={() => handleMoveClick(i + 2)}>{moveList[i + 1].to}</button>}
       </li>
     );
   }

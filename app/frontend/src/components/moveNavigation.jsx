@@ -3,7 +3,7 @@ import { FaArrowLeft } from "react-icons/fa";
 import { FaArrowRight } from "react-icons/fa";
 
 
-export default function MoveNavigation({ chessPosition, ...buttonProps }){
+export default function MoveNavigation(buttonProps){
 
   return (
     <div className="flex justify-center gap-[10px]">
