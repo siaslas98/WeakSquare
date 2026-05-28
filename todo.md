@@ -1,0 +1,2 @@
+# Implement Move Classification
+  - On each update of the board state, if result has not been cached, calculate expected_points_lost based on engine evaluation and rating and classify move into respective category.

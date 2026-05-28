@@ -1,8 +1,7 @@
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useState} from "react";
 import axios from "axios";
 
 export default function AnalysisPanel({fen, enabled = true}){
-  const socketRef = useRef(null);
   const [lines, setLines] = useState([]);
 
   useEffect(() => {
@@ -10,9 +9,8 @@ export default function AnalysisPanel({fen, enabled = true}){
 
     axios.post(`${import.meta.env.VITE_API_URL}/evaluate`, {fen})
     .then((response) => {
-      const responseLines = response.data.pv_list.map((lineObject) => lineObject.line);
+      const responseLines = response.data.pv_lines.map((lineObject) => lineObject.line);
       setLines(responseLines);
-      console.log(responseLines);
     })
     .catch((error) => console.log(error));
 

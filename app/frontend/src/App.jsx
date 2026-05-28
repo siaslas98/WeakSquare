@@ -4,6 +4,7 @@ import {Chess} from 'chess.js';
 import axios from "axios";
 import MoveNavigation from './components/moveNavigation.jsx';
 import MoveListPanel from './components/moveListPanel.jsx';
+import ResizableBoard from './components/ResizeableBoard.jsx';
 import AnalysisPanel from './components/analysisPanel.jsx';
 
 import './App.css';
@@ -198,7 +199,7 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
         boxShadow: '0 0 10px 0 rgba(0, 0, 0, 0.5)',
         border: '1px solid #000',
         margin: '20px auto',
-				width: '100%'
+				width: '100%',
       },
 			squareStyles: optionSquares
     };
@@ -234,9 +235,11 @@ function App() {
       <div className="min-h-screen w-[100vw]">
         <h1 className="mb-[2rem]">WeakSquare</h1>
         <FileUploader setMoveList={setMoveList} />
-        <div className=" flex max-h-[800px] w-[1000px] mx-auto mt-[100px] gap-[20px]">
-          <ChessBoard className="h-full" {...navProps} />
-          <MoveListPanel className="h-[500px]" moveList={moveList} goToMove={navProps.goToMove}></MoveListPanel>
+        <div className=" flex max-w-[1500px] mx-auto mt-[100px] gap-[35px]">
+          <ResizableBoard>
+            <ChessBoard {...navProps} />
+          </ResizableBoard>
+          <MoveListPanel moveList={moveList} goToMove={navProps.goToMove}></MoveListPanel>
         </div>
         <AnalysisPanel fen={chessPosition}/>
         <MoveNavigation {...navProps} />

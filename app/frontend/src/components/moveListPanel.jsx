@@ -18,7 +18,7 @@ export default function MoveListPanel({moveList, goToMove}){
   }
 
   return (
-    <ul className="flex flex-wrap list-none overflow-y-auto gap-2 w-[600px]">
+    <ul className="flex flex-wrap list-none overflow-y-auto gap-2 w-[400px] h-[720px]">
       {rows}
     </ul>
   );

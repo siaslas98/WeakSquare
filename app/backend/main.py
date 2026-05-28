@@ -86,30 +86,30 @@ async def evaluate(payload: EvaluateRequest):
     if engine is None:
         return {"error": "Engine not initialized"}
     
-    pv_list = []
+    pv_lines = []
 
     board = chess.Board(payload.fen)
     infoList = await engine.analyse(board, chess.engine.Limit(depth=15), multipv = 5)
 
-    for info in infoList:
-        score = info.get("score")
-        pv = info.get("pv")
+    for infoDict in infoList:
+        score = infoDict.get("score")
+        pv = infoDict.get("pv") # List of move objects
 
         white_score = None 
 
         if score is not None:
             white_score = score.white().score(mate_score=10000)
 
-        pv_moves = []
+        moves = []
+
         if pv:
             for move in pv:
                 piece = board.piece_at(move.from_square)
                 san = board.san(move)
 
-                pv_moves.append({
+                moves.append({
                     "uci": move.uci(),
                     "san": san,
-                    "piece": piece.symbol() if piece else None
                     }
                 )
 
@@ -117,11 +117,11 @@ async def evaluate(payload: EvaluateRequest):
         
         board.set_fen(payload.fen)
         
-        pv_list.append(
+        pv_lines.append(
             {'score': white_score,
-            'line': pv_moves}
+            'line': moves}
                         )
-    return {"pv_list": pv_list}
+    return {"pv_lines": pv_lines}
 
 @app.websocket("/evaluate-stream")
 async def evaluate_stream(websocket: WebSocket):

@@ -1,5 +1,5 @@
-li:nth-child(odd) { background: #375590; }
-li:nth-child(even) { background: #982e2e; }
+li:nth-child(odd) { background: #74d4ff;; }
+li:nth-child(even) { background: #8b7575; }
 
 .moveButton {
   background-color: transparent;
