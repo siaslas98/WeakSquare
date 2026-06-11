@@ -4,13 +4,19 @@ import asyncio
 import chess
 import chess.engine
 import chess.pgn
-from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect, File
+import psycopg2
+import hashlib
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-
+from database import db_engine, Base
+from sqlalchemy.orm import Session
+from database import db_engine, Base, get_db
+from models import Game
 
 engine: chess.engine.UciProtocol | None = None
+Base.metadata.create_all(bind=db_engine)
 
 
 class EvaluateRequest(BaseModel):
@@ -49,13 +55,34 @@ async def root():
     return {"message": "Hello World"}
 
 @app.post("/uploadFile/")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     contents = await file.read()
-    pgn = io.StringIO(contents.decode())
+    raw_pgn = contents.decode("utf-8")
+    pgn = io.StringIO(raw_pgn)
+    pgn_hash = hashlib.sha256(raw_pgn.encode("utf-8")).hexdigest()
 
     game = chess.pgn.read_game(pgn)
     if game is None:
         return {"error": "Invalid or empty PGN file"}
+
+    db_game = Game(
+        pgn_hash=pgn_hash,
+        white_player=game.headers.get("White"),
+        black_player=game.headers.get("Black"),
+        event=game.headers.get("Event"),
+        site=game.headers.get("Site"),
+        round_tag=game.headers.get("Round"),
+        date=game.headers.get("Date"),
+        result=game.headers.get("Result"),
+        time_control=game.headers.get("TimeControl"),
+        eco=game.headers.get("TimeControl"),
+        opening=game.headers.get("Opening"),
+        raw_pgn=raw_pgn,
+    )
+
+    db.add(db_game)
+    db.commit()
+    db.refresh(db_game)
 
     board = game.board()
 
@@ -104,10 +131,11 @@ async def evaluate(payload: EvaluateRequest):
 
         if pv:
             for move in pv:
-                piece = board.piece_at(move.from_square)
                 san = board.san(move)
+                piece = board.piece_at(move.from_square)                
 
                 moves.append({
+                    "pieceMoved": piece.unicode_symbol() if piece else None,
                     "uci": move.uci(),
                     "san": san,
                     }
@@ -176,5 +204,4 @@ async def analyze_position(websocket: WebSocket, fen: str):
                     
     except asyncio.CancelledError:
         raise
-
 
