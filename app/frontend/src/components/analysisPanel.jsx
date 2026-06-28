@@ -11,7 +11,6 @@ export default function AnalysisPanel({fen, enabled = true}){
     .then((response) => {
       const responseLines = response.data.pv_lines.map((lineObject) => lineObject.line);
       setLines(responseLines);
-      console.log(responseLines[0]);
     })
     .catch((error) => console.log(error));
 

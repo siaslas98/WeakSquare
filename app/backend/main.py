@@ -11,9 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from database import db_engine, Base
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from database import db_engine, Base, get_db
 from models import Game
+from move_classifier import classify_expected_points_loss, expected_points_from_cp, score_for_player
 
 engine: chess.engine.UciProtocol | None = None
 Base.metadata.create_all(bind=db_engine)
@@ -56,6 +58,10 @@ async def root():
 
 @app.post("/uploadFile/")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    active_engine = engine
+    if active_engine is None:
+        return {"error": "Engine not initialized"}
+
     contents = await file.read()
     raw_pgn = contents.decode("utf-8")
     pgn = io.StringIO(raw_pgn)
@@ -81,26 +87,65 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
     )
 
     db.add(db_game)
-    db.commit()
-    db.refresh(db_game)
+    try:
+        db.commit()
+        db.refresh(db_game)
+    except IntegrityError:
+        db.rollback()
 
     board = game.board()
-
     moves = []
-
     node = game
+
     while node.variations:
         next_node = node.variation(0)
 
         move = next_node.move
+        moving_color = board.turn
+        fen_before = board.fen()
+        san = board.san(move)
+
+        before_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
+        before_score = before_info.get("score")
+
+        expected_before = None
+        expected_after = None
+        expected_points_loss = None
+        classification = None
+
+        if before_score is not None:
+            before_white_score = before_score.white().score(mate_score=10000)
+            if before_white_score is not None:
+                before_player_score = score_for_player(before_white_score, moving_color)
+                expected_before = expected_points_from_cp(before_player_score)
+
+        board.push(move)
+        fen_after = board.fen()
+
+        after_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
+        after_score = after_info.get("score")
+
+        if after_score is not None:
+            after_white_score = after_score.white().score(mate_score=10000)
+            if after_white_score is not None:
+                after_player_score = score_for_player(after_white_score, moving_color)
+                expected_after = expected_points_from_cp(after_player_score)
+
+        if expected_before is not None and expected_after is not None:
+            expected_points_loss = expected_before - expected_after
+            classification = classify_expected_points_loss(expected_points_loss)
 
         moves.append({
             "uci": move.uci(),
-            "san": board.san(move),
-            "fen_before": board.fen(),
+            "san": san,
+            "fen_before": fen_before,
+            "fen_after": fen_after,
+            "expected_points_before": expected_before,
+            "expected_points_after": expected_after,
+            "expected_points_loss": expected_points_loss,
+            "classification": classification,
         })
 
-        board.push(move)
         node = next_node
 
     return {
@@ -150,58 +195,3 @@ async def evaluate(payload: EvaluateRequest):
             'line': moves}
                         )
     return {"pv_lines": pv_lines}
-
-@app.websocket("/evaluate-stream")
-async def evaluate_stream(websocket: WebSocket):
-
-    await websocket.accept()
-    
-    current_task: asyncio.Task | None = None
-
-    try:
-        while True:
-            message = await websocket.receive_json()
-            fen = message["fen"]
-
-            if current_task is not None:
-                current_task.cancel()
-                try:
-                    await current_task
-                except asyncio.CancelledError:
-                    pass
-            current_task = asyncio.create_task(
-                analyze_position(websocket, fen)
-            )
-    except WebSocketDisconnect:
-        if current_task is not None:
-            current_task.cancel()
-
-async def analyze_position(websocket: WebSocket, fen: str):
-    if engine is None:
-        await websocket.send_json({"error": "Engine not initialized"})
-        return
-    board = chess.Board(fen)
-
-    try:
-        with await engine.analysis(board) as analysis:
-            async for info in analysis:
-                score = info.get("score")
-                pv = info.get("pv")
-
-                white_score = None
-                if score is not None:
-                    white_score = score.white().score(mate_score=10000)
-                
-                pv_moves = []
-                if pv:
-                    pv_moves = [m.uci() for m in pv]
-                
-                await websocket.send_json({
-                    "fen": fen,
-                    "score": white_score,
-                    "pv": pv_moves
-                })
-                    
-    except asyncio.CancelledError:
-        raise
-

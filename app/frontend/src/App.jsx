@@ -8,8 +8,23 @@ import ResizableBoard from './components/ResizeableBoard.jsx';
 import AnalysisPanel from './components/analysisPanel.jsx';
 
 import './App.css';
+import bestIcon from './assets/chess_move_icons_svg_set/best.svg';
+import excellentIcon from "./assets/chess_move_icons_svg_set/excellent.svg";
+import goodIcon from "./assets/chess_move_icons_svg_set/good.svg";
+import inaccuracyIcon from "./assets/chess_move_icons_svg_set/inaccuracy.svg";
+import mistakeIcon from "./assets/chess_move_icons_svg_set/mistake.svg";
+import blunderIcon from "./assets/chess_move_icons_svg_set/blunder.svg";
 
-function FileUploader({setMoveList}) {
+const classificationMap = {
+  best: bestIcon,
+  excellent: excellentIcon,
+  good: goodIcon,
+  inaccuracy: inaccuracyIcon,
+  mistake: mistakeIcon,
+  blunder: blunderIcon, 
+}
+
+function FileUploader({setMoveList, setClassificationList}) {
   const [selectedFile, setSelectedFile] = useState(null);
 
 	const onFileChange = (e) => { 
@@ -28,16 +43,24 @@ function FileUploader({setMoveList}) {
     };
     reader.readAsText(selectedFile);
 
-    // Send parsed move list to backend
+    // Send pgn file to the backend
 		const formData = new FormData();
 		formData.append(
 			"file",
 			selectedFile
 		);
-    await axios.post( 
-      `${import.meta.env.VITE_API_URL}/uploadFile`, 
+    await axios
+    .post( 
+      `${import.meta.env.VITE_API_URL}/uploadFile/`, 
       formData
-    );
+    )
+    .then((res) => {
+      if (res.data.moves) {
+        setClassificationList(res.data.moves.map((move) => move.classification));
+      }
+
+    })
+    .catch((err) => console.error(err.response?.data ?? err));
 	};
 
   return (
@@ -50,11 +73,16 @@ function FileUploader({setMoveList}) {
 	);
 }
 
-function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveIndex, goToMove}){
-		const [moveFrom, setMoveFrom] = useState('');
-    const [optionSquares, setOptionSquares] = useState({});
+	function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveIndex, goToMove, currentMoveToSquare, currentClassification}){
+			const [moveFrom, setMoveFrom] = useState('');
+	    const [optionSquares, setOptionSquares] = useState({});
 
-    // Handle key press for left and right arrow keys
+	    useEffect(() => {
+	      setMoveFrom('');
+	      setOptionSquares({});
+	    }, [chessPosition]);
+
+	    // Handle key press for left and right arrow keys
     useEffect(() => {
      function handleKeyDown(e) {
       if(!moveList || moveList.length === 0) return;
@@ -97,8 +125,8 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
       // loop through the moves and set the option squares
       for (const move of moves) {
         newSquares[move.to] = {
-          background: chessGame.get(move.to) && chessGame.get(move.to)?.color !== chessGame.get(square)?.color ? 'radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)' // larger circle for capturing
-          : 'radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)', // smaller circle for moving
+          background: chessGame.get(move.to) && chessGame.get(move.to)?.color !== chessGame.get(square)?.color ? 'radial-gradient(circle, rgba(188, 43, 178, 0.61) 85%, transparent 85%)' // larger circle for capturing
+          : 'radial-gradient(circle, rgba(188, 43, 178, 0.61) 25%, transparent 25%)', // smaller circle for moving
           borderRadius: '50%'
         };
       }
@@ -114,7 +142,7 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
       // return true to indicate that there are move options
       return true;
     }
-    function onSquareClick(square, piece) {
+    function onSquareClick({square, piece}) {
       // Piece clicked to move
       if (!moveFrom && piece) {
         const hasMoveOptions = getMoveOptions(square);
@@ -129,6 +157,7 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
         square: moveFrom,
         verbose: true
       });
+      console.log(moves);
       const foundMove = moves.find(m => m.from === moveFrom && m.to === square);
 
       // Not a valid move
@@ -188,6 +217,33 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
         return false;
       }
     }
+
+    function classificationOverlayRenderer ({square, children}) {
+        return (
+          <div style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            ...optionSquares[square]
+          }}>
+            {children}
+            {square === currentMoveToSquare && currentClassification && (
+              <img
+                src={classificationMap[currentClassification]}
+                style={{
+                  position: "absolute",
+                  top: -12,
+                  right: -12,
+                  width: "60%",
+                  height: "60%",
+                  pointerEvents: "none",
+                  zIndex: 3,
+                }}
+              />
+            )}
+          </div>
+        );
+    }
     // Set the chessboard options
     const chessboardOptions = {
       position: chessPosition,
@@ -201,7 +257,8 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
         margin: '20px auto',
 				width: '100%',
       },
-			squareStyles: optionSquares
+			squareStyles: optionSquares,
+      squareRenderer: classificationOverlayRenderer,
     };
 
     // Render the chessboard
@@ -209,10 +266,10 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
 }
 
 function App() {
-  const [chessGame] = useState(() => new Chess());
+  const [chessGame, setChessGame] = useState(() => new Chess());
   const [chessPosition, setChessPosition] = useState(() => chessGame.fen());
-
   const [moveList, setMoveList] = useState([]);
+  const [classificationList, setClassificationList] = useState([]);
   const [moveIndex, setMoveIndex] = useState(0);
 
   function syncMoveIndex(update) {
@@ -228,14 +285,19 @@ function App() {
     setChessPosition(chessGame.fen());
   }
 
-  const navProps = { chessGame, chessPosition, setChessPosition, moveList, moveIndex, goToMove: syncMoveIndex };
+
+  const currentMove = moveIndex > 0 ? moveList[moveIndex-1] : null;
+  const currentClassification = moveIndex > 0 ? classificationList[moveIndex-1]: null;
+  const navProps = { chessGame, chessPosition, setChessPosition, 
+                     moveList, moveIndex, goToMove: syncMoveIndex,
+                     currentMoveToSquare: currentMove?.to, currentClassification};
 
   return (
     <div className="flex">
       <div className="min-h-screen w-[100vw]">
         <h1 className="mb-[2rem]">WeakSquare</h1>
-        <FileUploader setMoveList={setMoveList} />
-        <div className=" flex max-w-[1500px] mx-auto mt-[100px] gap-[35px]">
+        <FileUploader setMoveList={setMoveList} setClassificationList={setClassificationList}/>
+        <div className="flex max-w-[1500px] mx-auto mt-[100px] gap-[35px]">
           <ResizableBoard>
             <ChessBoard {...navProps} />
           </ResizableBoard>
