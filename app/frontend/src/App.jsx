@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {Chessboard} from 'react-chessboard';
 import {Chess} from 'chess.js';
 import axios from "axios";
+import GamesPage from './components/gamesPage.jsx';
 import MoveNavigation from './components/moveNavigation.jsx';
 import MoveListPanel from './components/moveListPanel.jsx';
 import ResizableBoard from './components/ResizeableBoard.jsx';
@@ -24,63 +25,14 @@ const classificationMap = {
   blunder: blunderIcon, 
 }
 
-function FileUploader({setMoveList, setClassificationList}) {
-  const [selectedFile, setSelectedFile] = useState(null);
+function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveIndex, goToMove, currentMoveToSquare, currentClassification}){
+    const [moveFrom, setMoveFrom] = useState('');
+    const [optionSquares, setOptionSquares] = useState({});
 
-	const onFileChange = (e) => { 
-		setSelectedFile(e.target.files[0]);
-	};
-
-  const onFileUpload = async () => {
-    if (!selectedFile) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const pgn = reader.result;
-      const game = new Chess();
-      game.loadPgn(pgn);
-      setMoveList(game.history({verbose: true}));
-    };
-    reader.readAsText(selectedFile);
-
-    // Send pgn file to the backend
-		const formData = new FormData();
-		formData.append(
-			"file",
-			selectedFile
-		);
-    await axios
-    .post( 
-      `${import.meta.env.VITE_API_URL}/uploadFile/`, 
-      formData
-    )
-    .then((res) => {
-      if (res.data.moves) {
-        setClassificationList(res.data.moves.map((move) => move.classification));
-      }
-
-    })
-    .catch((err) => console.error(err.response?.data ?? err));
-	};
-
-  return (
-		<div>
-			<div className ="flex justify-center gap-2">
-				<input type="file" className="bg-sky-300 text-stone-900 border-2 rounded-[8px] p-4 cursor-pointer" onChange={onFileChange} />
-				<button onClick={onFileUpload}>Upload</button>
-			</div>
-		</div>
-	);
-}
-
-	function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveIndex, goToMove, currentMoveToSquare, currentClassification}){
-			const [moveFrom, setMoveFrom] = useState('');
-	    const [optionSquares, setOptionSquares] = useState({});
-
-	    useEffect(() => {
-	      setMoveFrom('');
-	      setOptionSquares({});
-	    }, [chessPosition]);
+    useEffect(() => {
+      setMoveFrom('');
+      setOptionSquares({});
+    }, [chessPosition]);
 
 	    // Handle key press for left and right arrow keys
     useEffect(() => {
@@ -189,7 +141,7 @@ function FileUploader({setMoveList, setClassificationList}) {
       setOptionSquares({});
     }
     // Handle piece drop
-    function onPieceDrop(sourceSquare, targetSquare) {
+    function onPieceDrop({sourceSquare, targetSquare}) {
       // type narrow targetSquare potentially being null (e.g. if dropped off board)
       if (!targetSquare) {
         return false;
@@ -296,7 +248,7 @@ function App() {
     <div className="flex">
       <div className="min-h-screen w-[100vw]">
         <h1 className="mb-[2rem]">WeakSquare</h1>
-        <FileUploader setMoveList={setMoveList} setClassificationList={setClassificationList}/>
+        <GamesPage setMoveList={setMoveList} setClassificationList={setClassificationList}/>
         <div className="flex max-w-[1500px] mx-auto mt-[100px] gap-[35px]">
           <ResizableBoard>
             <ChessBoard {...navProps} />
