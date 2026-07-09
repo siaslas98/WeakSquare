@@ -19,6 +19,7 @@ from move_classifier import classify_expected_points_loss, expected_points_from_
 
 engine: chess.engine.UciProtocol | None = None
 Base.metadata.create_all(bind=db_engine)
+engine_lock = asyncio.Lock()
 
 
 class EvaluateRequest(BaseModel):
@@ -55,6 +56,30 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+@app.get("/gamesList")
+async def get_games_list(db: Session = Depends(get_db)):
+    games = db.query(Game.id,
+                     Game.white_player,
+                     Game.black_player,
+                     Game.event,
+                     Game.date,
+                     Game.result,
+                     Game.raw_pgn).order_by(Game.created_at.desc()).all()
+    
+    return [
+        {
+            "id": game.id,
+            "white_player": game.white_player,
+            "black_player": game.black_player,
+            'event': game.event,
+            "date": game.date,
+            "result": game.result,
+            "pgn": game.raw_pgn,
+        }
+
+        for game in games
+    ]
 
 @app.post("/uploadFile/")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -105,7 +130,8 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         fen_before = board.fen()
         san = board.san(move)
 
-        before_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
+        async with engine_lock:
+            before_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
         before_score = before_info.get("score")
 
         expected_before = None
@@ -122,7 +148,8 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         board.push(move)
         fen_after = board.fen()
 
-        after_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
+        async with engine_lock:
+            after_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
         after_score = after_info.get("score")
 
         if after_score is not None:
@@ -161,7 +188,8 @@ async def evaluate(payload: EvaluateRequest):
     pv_lines = []
 
     board = chess.Board(payload.fen)
-    infoList = await engine.analyse(board, chess.engine.Limit(depth=15), multipv = 5)
+    async with engine_lock:
+        infoList = await engine.analyse(board, chess.engine.Limit(depth=15), multipv = 5)
 
     for infoDict in infoList:
         score = infoDict.get("score")
@@ -195,3 +223,4 @@ async def evaluate(payload: EvaluateRequest):
             'line': moves}
                         )
     return {"pv_lines": pv_lines}
+

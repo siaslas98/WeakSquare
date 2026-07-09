@@ -5,6 +5,22 @@ import MoveNavigation from './moveNavigation.jsx';
 import MoveListPanel from './moveListPanel.jsx';
 import AnalysisPanel from './analysisPanel.jsx';
 
+import bestIcon from '../assets/chess_move_icons_svg_set/best.svg';
+import excellentIcon from "../assets/chess_move_icons_svg_set/excellent.svg";
+import goodIcon from "../assets/chess_move_icons_svg_set/good.svg";
+import inaccuracyIcon from "../assets/chess_move_icons_svg_set/inaccuracy.svg";
+import mistakeIcon from "../assets/chess_move_icons_svg_set/mistake.svg";
+import blunderIcon from "../assets/chess_move_icons_svg_set/blunder.svg";
+
+const classificationMap = {
+  best: bestIcon,
+  excellent: excellentIcon,
+  good: goodIcon,
+  inaccuracy: inaccuracyIcon,
+  mistake: mistakeIcon,
+  blunder: blunderIcon, 
+}
+
 function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveIndex, goToMove, currentMoveToSquare, currentClassification}){
     const [moveFrom, setMoveFrom] = useState('');
     const [optionSquares, setOptionSquares] = useState({});

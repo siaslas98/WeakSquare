@@ -16,3 +16,8 @@ body{
   vertical-align: bottom;
   transform: translateY(-4px);
 }
+
+.navLink:hover{
+  background-color: rgb(113, 186, 113);
+  text-decoration: None;
+}

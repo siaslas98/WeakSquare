@@ -1,8 +1,8 @@
 import {useState} from 'react';
-import {Chess} from 'chess.js';
 import axios from 'axios';
+import GamesList from './gamesList';
 
-function FileUploader({setMoveList, setClassificationList}) {
+function FileUploader({onGameLoaded, setClassificationList}) {
   const [selectedFile, setSelectedFile] = useState(null);
 
 	const onFileChange = (e) => { 
@@ -15,9 +15,7 @@ function FileUploader({setMoveList, setClassificationList}) {
     const reader = new FileReader();
     reader.onload = () => {
       const pgn = reader.result;
-      const game = new Chess();
-      game.loadPgn(pgn);
-      setMoveList(game.history({verbose: true}));
+      onGameLoaded(pgn);
     };
     reader.readAsText(selectedFile);
 
@@ -51,8 +49,11 @@ function FileUploader({setMoveList, setClassificationList}) {
 	);
 }
 
-export default function GamesPage({setMoveList, setClassificationList}){
+export default function GamesPage({onGameLoaded, setClassificationList}){
   return(
-    <FileUploader setMoveList={setMoveList} setClassificationList={setClassificationList}/>
+    <>
+      <FileUploader onGameLoaded={onGameLoaded} setClassificationList={setClassificationList}/>
+      <GamesList onGameLoaded={onGameLoaded}/>
+    </>
   );
 }
