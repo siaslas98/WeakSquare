@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import {Routes, Route} from 'react-router-dom';
 import {Chess} from 'chess.js';
+
+
+import NavBar from './components/navBar.jsx';
 import GamesPage from './components/gamesPage.jsx';
 import AnalysisPage from './components/analysisPage.jsx';
-import NavBar from './components/navBar.jsx';
 
-import './App.css';
 import bestIcon from './assets/chess_move_icons_svg_set/best.svg';
 import excellentIcon from "./assets/chess_move_icons_svg_set/excellent.svg";
 import goodIcon from "./assets/chess_move_icons_svg_set/good.svg";

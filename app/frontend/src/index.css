@@ -71,3 +71,27 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+#root {
+  width: 100vw;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+body{
+  overflow-x: hidden;
+}
+
+.piece-symbol {
+  display: inline-block;
+  font-size: 24px;
+  line-height: 1;
+  vertical-align: bottom;
+  transform: translateY(-4px);
+}
+
+.navLink:hover{
+  background-color: rgb(113, 186, 113);
+  text-decoration: None;
+}
