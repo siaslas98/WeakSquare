@@ -1,6 +1,6 @@
 import '../styles/moveListPanel.css'
 
-export default function MoveListPanel({moveList, goToMove}){
+export default function MoveListPanel({moveList, goToMove, panelHeight}){
   const handleMoveClick = (j) => {
     goToMove(j);
   };
@@ -18,7 +18,7 @@ export default function MoveListPanel({moveList, goToMove}){
   }
 
   return (
-    <ul className="flex flex-wrap list-none overflow-y-auto gap-2 w-[400px] h-[720px]">
+    <ul className="flex flex-wrap list-none overflow-y-auto w-[400px]" style={{ height: `${panelHeight}px` }}>
       {rows}
     </ul>
   );

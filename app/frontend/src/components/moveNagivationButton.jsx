@@ -2,7 +2,7 @@
 export default function MoveNaviationButton({name, logo, moveList, goToMove}){
   return (
     <>
-      <button onClick={() => {
+      <button style={{ backgroundColor: '#B4D2E7' }} onClick={() => {
         if(name === 'left'){
           // Undo a move if possible
           goToMove((prev) => {

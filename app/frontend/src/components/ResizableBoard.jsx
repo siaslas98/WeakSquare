@@ -1,8 +1,6 @@
-import {useState} from "react";
 import { LuMoveDiagonal2 } from "react-icons/lu";
 
-export default function ResizableBoard({children}){
-  const [boardSize, setBoardSize] = useState(560);
+export default function ResizableBoard({children, boardSize, onResize}){
 
   function startResize(e){
     e.preventDefault();
@@ -13,7 +11,7 @@ export default function ResizableBoard({children}){
     function handleMouseMove(moveEvent) {
       const delta = moveEvent.clientX - startX;
       const nextSize = Math.min(Math.max(startSize + delta, 320), 800);
-      setBoardSize(nextSize);
+      onResize(nextSize);
     }
 
     function handleMouseUp() {

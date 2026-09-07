@@ -204,7 +204,7 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
         borderRadius: '10px',
         boxShadow: '0 0 10px 0 rgba(0, 0, 0, 0.5)',
         border: '1px solid #000',
-        margin: '20px auto',
+				margin: '0 auto',
 				width: '100%',
       },
 			squareStyles: optionSquares,
@@ -216,17 +216,20 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
 }
 
 export default function Analysis({analysisProps}){
+  const [boardSize, setBoardSize] = useState(560);
   const {moveList, chessPosition, goToMove} = analysisProps;
 
   return (
   <>
-    <div className="flex max-w-[1500px] mx-auto mt-[100px] gap-[35px]">
-      <ResizableBoard>
+    <div className="flex max-w-[1500px] mx-auto mt-[100px] gap-[35px] justify-center">
+      <ResizableBoard boardSize={boardSize} onResize={setBoardSize}>
         <ChessBoard {...analysisProps} />
       </ResizableBoard>
-      <MoveListPanel moveList={moveList} goToMove={goToMove} />
+      <MoveListPanel moveList={moveList} goToMove={goToMove} panelHeight={boardSize} />
     </div>
-    <AnalysisPanel fen={chessPosition}/>
+    <div className="mt-[40px]">
+      <AnalysisPanel fen={chessPosition}/>
+    </div>
     <MoveNavigation {...analysisProps} />
   </>
   );
