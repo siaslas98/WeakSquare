@@ -25,6 +25,8 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
     const [moveFrom, setMoveFrom] = useState('');
     const [optionSquares, setOptionSquares] = useState({});
 
+    console.log(currentClassification);
+
     useEffect(() => {
       setMoveFrom('');
       setOptionSquares({});
@@ -213,17 +215,19 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
     return <Chessboard options={chessboardOptions} />;
 }
 
-export default function Analysis({navProps, moveList, chessPosition}){
+export default function Analysis({analysisProps}){
+  const {moveList, chessPosition, goToMove} = analysisProps;
+
   return (
   <>
     <div className="flex max-w-[1500px] mx-auto mt-[100px] gap-[35px]">
       <ResizableBoard>
-        <ChessBoard {...navProps} />
+        <ChessBoard {...analysisProps} />
       </ResizableBoard>
-      <MoveListPanel moveList={moveList} goToMove={navProps.goToMove}></MoveListPanel>
+      <MoveListPanel moveList={moveList} goToMove={goToMove} />
     </div>
     <AnalysisPanel fen={chessPosition}/>
-    <MoveNavigation {...navProps} />
+    <MoveNavigation {...analysisProps} />
   </>
   );
 }

@@ -1,25 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {Routes, Route} from 'react-router-dom';
 import {Chess} from 'chess.js';
-
 
 import NavBar from './components/navBar.jsx';
 import GamesPage from './components/gamesPage.jsx';
 import AnalysisPage from './components/analysisPage.jsx';
 
-import bestIcon from './assets/chess_move_icons_svg_set/best.svg';
-import excellentIcon from "./assets/chess_move_icons_svg_set/excellent.svg";
-import goodIcon from "./assets/chess_move_icons_svg_set/good.svg";
-import inaccuracyIcon from "./assets/chess_move_icons_svg_set/inaccuracy.svg";
-import mistakeIcon from "./assets/chess_move_icons_svg_set/mistake.svg";
-import blunderIcon from "./assets/chess_move_icons_svg_set/blunder.svg";
-
-
 function App() {
   const [chessGame, setChessGame] = useState(() => new Chess());
   const [chessPosition, setChessPosition] = useState(() => chessGame.fen());
   const [moveList, setMoveList] = useState([]);
-  const [classificationList, setClassificationList] = useState([]);
+  const [classificationList, setClassificationList] = useState([]); // This stores the chess move classification for each move
   const [moveIndex, setMoveIndex] = useState(0);
 
   function syncMoveIndex(update) {
@@ -47,9 +38,15 @@ function App() {
 
   const currentMove = moveIndex > 0 ? moveList[moveIndex-1] : null;
   const currentClassification = moveIndex > 0 ? classificationList[moveIndex-1]: null;
-  const navProps = { chessGame, chessPosition, setChessPosition, 
-                     moveList, moveIndex, goToMove: syncMoveIndex,
-                     currentMoveToSquare: currentMove?.to, currentClassification};
+  const analysisProps = { chessGame,
+                          chessPosition,
+                          setChessPosition, 
+                          moveList,
+                          moveIndex, 
+                          goToMove: syncMoveIndex,
+                          currentMoveToSquare: currentMove?.to,
+                          currentClassification
+                        };
 
   return (
     <div className="flex">
@@ -58,7 +55,7 @@ function App() {
         <NavBar />
         <Routes>
           <Route path="/" element={<GamesPage onGameLoaded={loadGameFromPgn} setClassificationList={setClassificationList} />} />
-          <Route path="/analysis" element={<AnalysisPage navProps={navProps} moveList={moveList} chessPosition={chessPosition}/>} />
+          <Route path="/analysis" element={<AnalysisPage analysisProps={analysisProps}/>} />
         </Routes>
       </div>
     </div>

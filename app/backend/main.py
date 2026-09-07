@@ -4,27 +4,27 @@ import asyncio
 import chess
 import chess.engine
 import chess.pgn
-import psycopg2
 import hashlib
-from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect, File, Depends
+import logging
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-from database import db_engine, Base
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from database import db_engine, Base, get_db
-from models import Game
+from models import Game, MoveAnalysis
 from move_classifier import classify_expected_points_loss, expected_points_from_cp, score_for_player
 
 engine: chess.engine.UciProtocol | None = None
 Base.metadata.create_all(bind=db_engine)
 engine_lock = asyncio.Lock()
-
+logger = logging.getLogger(__name__)
 
 class EvaluateRequest(BaseModel):
     fen: str
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,9 +53,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 @app.get("/gamesList")
 async def get_games_list(db: Session = Depends(get_db)):
@@ -82,22 +82,23 @@ async def get_games_list(db: Session = Depends(get_db)):
     ]
 
 @app.post("/uploadFile/")
-async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_file(file: UploadFile, db: Session = Depends(get_db)):
     active_engine = engine
     if active_engine is None:
         return {"error": "Engine not initialized"}
 
     contents = await file.read()
+    pgn_hash = hashlib.sha256(contents).hexdigest()
     raw_pgn = contents.decode("utf-8")
     pgn = io.StringIO(raw_pgn)
-    pgn_hash = hashlib.sha256(raw_pgn.encode("utf-8")).hexdigest()
-
     game = chess.pgn.read_game(pgn)
+
     if game is None:
         return {"error": "Invalid or empty PGN file"}
 
     db_game = Game(
         pgn_hash=pgn_hash,
+        raw_pgn=raw_pgn,
         white_player=game.headers.get("White"),
         black_player=game.headers.get("Black"),
         event=game.headers.get("Event"),
@@ -106,74 +107,93 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         date=game.headers.get("Date"),
         result=game.headers.get("Result"),
         time_control=game.headers.get("TimeControl"),
-        eco=game.headers.get("TimeControl"),
+        eco=game.headers.get("ECO"),
         opening=game.headers.get("Opening"),
-        raw_pgn=raw_pgn,
+        analysis_status="analyzing"
     )
 
     db.add(db_game)
     try:
         db.commit()
         db.refresh(db_game)
+
     except IntegrityError:
         db.rollback()
 
-    board = game.board()
-    moves = []
-    node = game
+        db_game = (
+            db.query(Game)
+            .filter(Game.pgn_hash == pgn_hash)
+            .one()
+        )
 
-    while node.variations:
-        next_node = node.variation(0)
+    game_id = db_game.id
 
-        move = next_node.move
-        moving_color = board.turn
-        fen_before = board.fen()
-        san = board.san(move)
+    try:
+        board = game.board()
+        moves = []
+        move_analysis_rows = [] # Stores move classifications
+        node = game
+        ply_index = 0
 
-        async with engine_lock:
-            before_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
-        before_score = before_info.get("score")
+        while node.variations:
+            next_node = node.variation(0)
 
-        expected_before = None
-        expected_after = None
-        expected_points_loss = None
-        classification = None
+            move = next_node.move
+            moving_color = board.turn
+            fen_before = board.fen()
+            san = board.san(move)
 
-        if before_score is not None:
-            before_white_score = before_score.white().score(mate_score=10000)
-            if before_white_score is not None:
-                before_player_score = score_for_player(before_white_score, moving_color)
-                expected_before = expected_points_from_cp(before_player_score)
+            classification, expected_before, expected_after, expected_points_loss = await calculate_classification(board, move, moving_color)
+            fen_after = board.fen()
 
-        board.push(move)
-        fen_after = board.fen()
+            moves.append({
+                "uci": move.uci(),
+                "san": san,
+                "fen_before": fen_before,
+                "fen_after": fen_after,
+                "expected_points_before": expected_before,
+                "expected_points_after": expected_after,
+                "expected_points_loss": expected_points_loss,
+                "classification": classification,
+            })
 
-        async with engine_lock:
-            after_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
-        after_score = after_info.get("score")
+            # Storing the result of the calculations
+            move_analysis_rows.append(
+                MoveAnalysis(
+                    game_id=game_id,
+                    ply_index=ply_index,
+                    move_uci=move.uci(),
+                    fen_before=fen_before,
+                    expected_points_before=expected_before,
+                    expected_points_after=expected_after,
+                    expected_points_loss=expected_points_loss,
+                    classification=classification, 
+                )
+            )
 
-        if after_score is not None:
-            after_white_score = after_score.white().score(mate_score=10000)
-            if after_white_score is not None:
-                after_player_score = score_for_player(after_white_score, moving_color)
-                expected_after = expected_points_from_cp(after_player_score)
+            ply_index += 1
+            node = next_node
 
-        if expected_before is not None and expected_after is not None:
-            expected_points_loss = expected_before - expected_after
-            classification = classify_expected_points_loss(expected_points_loss)
+        db.add_all(move_analysis_rows)
+        db_game.analysis_status = "complete"
+        db.commit()
 
-        moves.append({
-            "uci": move.uci(),
-            "san": san,
-            "fen_before": fen_before,
-            "fen_after": fen_after,
-            "expected_points_before": expected_before,
-            "expected_points_after": expected_after,
-            "expected_points_loss": expected_points_loss,
-            "classification": classification,
-        })
+    except Exception:
+        db.rollback()
+        logger.exception(
+            f"Analysis failed for game_id={game_id}"
+        )
 
-        node = next_node
+        failed_game = (
+            db.query(Game)
+            .filter(Game.id == game_id)
+            .one_or_none()
+        )
+
+        if failed_game is not None:
+            failed_game.analysis_status = "failed"
+            db.commit()
+        raise
 
     return {
         "headers": dict(game.headers),
@@ -224,3 +244,80 @@ async def evaluate(payload: EvaluateRequest):
                         )
     return {"pv_lines": pv_lines}
 
+@app.get("/classificationData/{gameId}")
+async def get_classification_data(gameId: int, db: Session=Depends(get_db)):
+    game = db.query(Game).filter(Game.id == gameId).first()
+
+    if game is None:
+        raise HTTPException(status_code=404, 
+                            detail="Game not found")
+    
+    if game.analysis_status in {"pending", "analyzing"}:
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": game.analysis_status,
+                "classification": [],
+            }
+        )
+
+    if game.analysis_status == "failed":
+        raise HTTPException(
+            status_code=500,
+            detail="Game analysis failed"
+        )
+    
+    rows = (
+        db.query(MoveAnalysis.classification)
+        .filter(MoveAnalysis.game_id == gameId)
+        .order_by(MoveAnalysis.ply_index)
+        .all()
+    )
+
+    classifications = [
+        row.classification for row in rows
+    ]
+    
+    return {
+        "status": "complete",
+        "classification": classifications
+        }
+
+async def calculate_classification(board, move, moving_color):
+    active_engine = engine
+
+    if active_engine is None:
+        raise RuntimeError("Engine is not initialized")
+
+    async with engine_lock:
+        before_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
+    before_score = before_info.get("score")
+
+    expected_before = None
+    expected_after = None
+    expected_points_loss = None
+    classification = None
+
+    if before_score is not None:
+        before_white_score = before_score.white().score(mate_score=10000)
+        if before_white_score is not None:
+            before_player_score = score_for_player(before_white_score, moving_color)
+            expected_before = expected_points_from_cp(before_player_score)
+
+    board.push(move)
+
+    async with engine_lock:
+        after_info = await active_engine.analyse(board, chess.engine.Limit(depth=15))
+    after_score = after_info.get("score")
+
+    if after_score is not None:
+        after_white_score = after_score.white().score(mate_score=10000)
+        if after_white_score is not None:
+            after_player_score = score_for_player(after_white_score, moving_color)
+            expected_after = expected_points_from_cp(after_player_score)
+
+    if expected_before is not None and expected_after is not None:
+        expected_points_loss = expected_before - expected_after
+        classification = classify_expected_points_loss(expected_points_loss)
+
+    return (classification, expected_before, expected_after, expected_points_loss)

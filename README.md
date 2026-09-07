@@ -1,4 +1,4 @@
-# WeakSquare
+ WeakSquare
 
 ## Concept
 A chess training web app that ingests your games, allows you to tag and analyze mistakes by theme and severity, and generates a prioritized training queue of positions to help you systematically fix recurring weaknesses.

@@ -21,12 +21,8 @@ function FileUploader({onGameLoaded, setClassificationList}) {
 
     // Send pgn file to the backend
 		const formData = new FormData();
-		formData.append(
-			"file",
-			selectedFile
-		);
-    await axios
-    .post( 
+		formData.append("file", selectedFile);
+    await axios.post( 
       `${import.meta.env.VITE_API_URL}/uploadFile/`, 
       formData
     )
@@ -41,9 +37,14 @@ function FileUploader({onGameLoaded, setClassificationList}) {
 
   return (
 		<div>
-			<div className ="flex justify-center gap-2">
-				<input type="file" className="bg-sky-300 text-stone-900 border-2 rounded-[8px] p-4 cursor-pointer" onChange={onFileChange} />
-				<button onClick={onFileUpload}>Upload</button>
+			<div className="flex justify-center gap-2">
+				<input
+					type="file"
+					className="text-stone-900 border-2 rounded-[8px] p-4 cursor-pointer"
+					style={{ backgroundColor: '#C98686' }}
+					onChange={onFileChange}
+				/>
+				<button onClick={onFileUpload} style={{ backgroundColor: '#C98686' }}>Upload</button>
 			</div>
 		</div>
 	);
@@ -53,7 +54,7 @@ export default function GamesPage({onGameLoaded, setClassificationList}){
   return(
     <>
       <FileUploader onGameLoaded={onGameLoaded} setClassificationList={setClassificationList}/>
-      <GamesList onGameLoaded={onGameLoaded}/>
+      <GamesList onGameLoaded={onGameLoaded} setClassification={setClassificationList}/>
     </>
   );
 }

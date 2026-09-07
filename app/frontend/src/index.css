@@ -92,6 +92,6 @@ body{
 }
 
 .navLink:hover{
-  background-color: rgb(113, 186, 113);
-  text-decoration: None;
+  background-color: #76AAB3;
+  text-decoration: none;
 }
