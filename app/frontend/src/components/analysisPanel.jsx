@@ -1,5 +1,4 @@
 import {useEffect, useState} from "react";
-import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 function formatMove(move) {
@@ -24,19 +23,41 @@ export default function AnalysisPanel({fen, enabled = true}){
   useEffect(() => {
     if (!enabled || !fen) return;
 
-    axios.post(`${import.meta.env.VITE_API_URL}/evaluate`, {fen})
-      .then((response) => {
-        const responseLines = response.data.pv_lines.map((lineObject) => lineObject.line);
-        setLines(responseLines);
-        setExpandedLines({});
-      })
-    .catch((error) => console.log(error));
+    setLines([]);
+    setExpandedLines({});
+
+    const streamUrl = new URL(
+      `${import.meta.env.VITE_API_URL}/evaluate/stream`
+    );
+    streamUrl.searchParams.set("fen", fen);
+
+    const eventSource = new EventSource(streamUrl);
+
+    eventSource.onmessage = (event) => {
+      const update = JSON.parse(event.data);
+      const lineIndex = update.multipv - 1;
+
+      if (lineIndex < 0) return;
+
+      setLines((previousLines) => {
+        const nextLines = [...previousLines];
+        nextLines[lineIndex] = update.line;
+        return nextLines;
+      });
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("Analysis stream error", error);
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
 
   }, [enabled, fen]);
 
   return(
     <div className="bg-[#B4D2E7] w-[60%] p-[25px] m-auto my-[10px]">
-      {lines.map((line, i) => (
+      {lines.map((line, i) => line && (
         <div key={i} className="m-[20px] border-2 text-stone-900 p-[10px]">
           {line.slice(0, expandedLines[i] ? line.length : 10).map((move, j) => (
             <span key={j}>

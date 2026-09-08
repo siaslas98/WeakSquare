@@ -6,8 +6,10 @@ import chess.engine
 import chess.pgn
 import hashlib
 import logging
+import json
+from collections.abc import AsyncIterator
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
@@ -243,6 +245,68 @@ async def evaluate(payload: EvaluateRequest):
             'line': moves}
                         )
     return {"pv_lines": pv_lines}
+
+async def generate_analysis_events(fen: str) -> AsyncIterator[str]:
+    root_board = chess.Board(fen)
+
+    async with engine_lock:
+        with await engine.analysis(
+            root_board,
+            chess.engine.Limit(time=20),
+            multipv=5,
+        ) as analysis:
+            async for info in analysis:
+                pv_board = chess.Board(fen)
+                score = info.get("score")
+                pv = info.get("pv")
+
+                white_score = None
+                moves = []
+
+                if score is not None:
+                    white_score = score.white().score(mate_score=10000)
+
+                if pv:
+                    for move in pv:
+                        san = pv_board.san(move)
+                        piece = pv_board.piece_at(move.from_square)
+
+                        moves.append({
+                            "pieceMoved": piece.unicode_symbol() if piece else None,
+                            "uci": move.uci(),
+                            "san": san,
+                        })
+
+                        pv_board.push(move)
+
+                payload = {
+                    "multipv": info.get("multipv"),
+                    "depth": info.get("depth"),
+                    "whiteScore": white_score,
+                    "line": moves,
+                }
+
+                yield f"data: {json.dumps(payload)}\n\n"
+
+
+@app.get("/evaluate/stream", response_class=StreamingResponse)
+async def stream_evaluate(fen : str) -> StreamingResponse:
+    if engine is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Engine not initialized"
+        )
+
+    try:
+        chess.Board(fen)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Invalid FEN") from error
+
+    return StreamingResponse(
+        generate_analysis_events(fen),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 @app.get("/classificationData/{gameId}")
 async def get_classification_data(gameId: int, db: Session=Depends(get_db)):
