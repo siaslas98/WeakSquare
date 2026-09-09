@@ -16,7 +16,13 @@ function formatMove(move) {
   return move.san;
 }
 
-export default function AnalysisPanel({fen, enabled = true}){
+function formatCentipawnScore(score) {
+  if (score === null || score === undefined) return "-";
+  const normalizedScore = score / 100;
+  return `${normalizedScore > 0 ? "+" : ""}${normalizedScore.toFixed(2)}`;
+}
+
+export default function AnalysisPanel({fen, enabled = true, panelWidth}){
   const [lines, setLines] = useState([]);
   const [expandedLines, setExpandedLines] = useState({});
 
@@ -35,13 +41,26 @@ export default function AnalysisPanel({fen, enabled = true}){
 
     eventSource.onmessage = (event) => {
       const update = JSON.parse(event.data);
+      console.log("Analysis update", {
+        multipv: update.multipv,
+        depth: update.depth,
+        line: update.line,
+      });
       const lineIndex = update.multipv - 1;
 
       if (lineIndex < 0) return;
 
       setLines((previousLines) => {
         const nextLines = [...previousLines];
-        nextLines[lineIndex] = update.line;
+        nextLines[lineIndex] = {
+          line: update.line,
+          whiteScore: update.whiteScore,
+          depth: update.depth,
+        };
+        console.log(
+          "Stored analysis lines",
+          nextLines.map((line, index) => line ? index + 1 : null)
+        );
         return nextLines;
       });
     };
@@ -56,15 +75,21 @@ export default function AnalysisPanel({fen, enabled = true}){
   }, [enabled, fen]);
 
   return(
-    <div className="bg-[#B4D2E7] w-[60%] p-[25px] m-auto my-[10px]">
-      {lines.map((line, i) => line && (
+    <div
+      className="bg-[#B4D2E7] p-[25px] m-auto my-[10px]"
+      style={{ width: `${panelWidth}px` }}
+    >
+      {lines.map((pv, i) => pv && (
         <div key={i} className="m-[20px] border-2 text-stone-900 p-[10px]">
-          {line.slice(0, expandedLines[i] ? line.length : 10).map((move, j) => (
+          <span className="font-semibold">
+            {formatCentipawnScore(pv.whiteScore)}{" "}
+          </span>
+          {pv.line.slice(0, expandedLines[i] ? pv.line.length : 10).map((move, j) => (
             <span key={j}>
               {formatMove(move)}{" "}
             </span>
           ))}
-          {line.length > 10 && (
+          {pv.line.length > 10 && (
             <>
               {!expandedLines[i] && <span>...</span>}{" "}
               <button

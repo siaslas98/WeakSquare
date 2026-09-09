@@ -218,6 +218,8 @@ function ChessBoard({chessGame, chessPosition, setChessPosition, moveList, moveI
 export default function Analysis({analysisProps}){
   const [boardSize, setBoardSize] = useState(560);
   const {moveList, chessPosition, goToMove} = analysisProps;
+  const moveListWidth = 400;
+  const panelGap = 35;
 
   return (
   <>
@@ -228,7 +230,10 @@ export default function Analysis({analysisProps}){
       <MoveListPanel moveList={moveList} goToMove={goToMove} panelHeight={boardSize} />
     </div>
     <div className="mt-[40px]">
-      <AnalysisPanel fen={chessPosition}/>
+      <AnalysisPanel
+        fen={chessPosition}
+        panelWidth={boardSize + moveListWidth + panelGap}
+      />
     </div>
     <MoveNavigation {...analysisProps} />
   </>

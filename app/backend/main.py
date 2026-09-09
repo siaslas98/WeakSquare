@@ -55,10 +55,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
 @app.get("/gamesList")
 async def get_games_list(db: Session = Depends(get_db)):
     games = db.query(Game.id,
@@ -287,7 +283,6 @@ async def generate_analysis_events(fen: str) -> AsyncIterator[str]:
                 }
 
                 yield f"data: {json.dumps(payload)}\n\n"
-
 
 @app.get("/evaluate/stream", response_class=StreamingResponse)
 async def stream_evaluate(fen : str) -> StreamingResponse:
